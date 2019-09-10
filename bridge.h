@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdio.h>
+#include <cstdio>
 
 
-void bridge_read(const char *bridge, FILE *stream);
+void bridge_read(const char *bridge, std::FILE *stream);
