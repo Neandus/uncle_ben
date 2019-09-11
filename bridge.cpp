@@ -3,12 +3,12 @@
 #include <linux/if_ether.h>
 #include <net/if.h>
 
-
 #include <cstdio>
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
 #include <vector>
+#include <iostream>
 
 #include "bridge.h"
 
@@ -20,16 +20,33 @@ typedef struct bridge_mac {
 	uint8_t addr[ETH_ALEN];
 }bridge_mac_t;
 
-static void bridge_display_info(const bridge_mac_t & b, FILE *stream)
+static std::vector<bridge_mac_t> lastest_bridge_info;
+
+static std::vector<bridge_mac_t> bridge_read(const char *bridge);
+static int bridge_cmp_vec(const std::vector<bridge_mac_t> &bv1, const std::vector<bridge_mac_t> &bv2);
+static int bridge_cmp(const bridge_mac_t &b1, const bridge_mac_t &b2);
+static void bridge_display_info(const bridge_mac_t & b, std::FILE *stream);
+
+
+void bridge_update(const char *bridge)
 {
-	fprintf(stream, "interface name: %s\n", b.ifname);
-	char mac[19];
-	snprintf(mac, sizeof(mac), "%02x:%02x:%02x:%02x:%02x:%02x",
-        b.addr[0], b.addr[1], b.addr[2], b.addr[3], b.addr[4], b.addr[5]);
-	fprintf(stream, "mac address: %s\n", mac);
+	std::vector<bridge_mac_t> current_bridge_info = bridge_read(bridge);
+
+	int vec_cmp_result = bridge_cmp_vec(lastest_bridge_info, current_bridge_info);
+
+	if(vec_cmp_result)
+	{
+		lastest_bridge_info = current_bridge_info;
+		printf("---------------------------------------------------------------\n");
+		for(const bridge_mac_t & b : current_bridge_info)
+		{
+			bridge_display_info(b, stdout);
+		}
+		printf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+	}
 }
 
-void bridge_read(const char *bridge, std::FILE *stream)
+static std::vector<bridge_mac_t> bridge_read(const char *bridge)
 {
 	struct __fdb_entry fe[BR_MAX_ENTRY];
 	char path[PATH_MAX];
@@ -39,7 +56,7 @@ void bridge_read(const char *bridge, std::FILE *stream)
 	std::FILE* fd = std::fopen(path, "r");
     if(!fd) {
         std::perror("File opening failed");
-        return;
+        return {};
     }
 
 	int cnt = fread(fe, sizeof(struct __fdb_entry), BR_MAX_ENTRY, fd);
@@ -53,10 +70,37 @@ void bridge_read(const char *bridge, std::FILE *stream)
 		bridge_vec.push_back(b);
 	}
 
-	fprintf(stream, "---------------------------------------------------------------\n");
-	for(const auto & b : bridge_vec)
+	return bridge_vec;
+}
+
+static int bridge_cmp_vec(const std::vector<bridge_mac_t> &bv1, const std::vector<bridge_mac_t> &bv2)
+{
+	if(bv1.size() != bv2.size())
+		return 1;
+
+	std::vector<bridge_mac_t>::const_iterator it_bv1 = bv1.cbegin();
+	std::vector<bridge_mac_t>::const_iterator it_bv2 = bv2.cbegin();
+
+	int cmp_result = 0;
+	for(; it_bv1 != bv1.cend(); it_bv1++, it_bv2++)
 	{
-		bridge_display_info(b, stream);
+		cmp_result += bridge_cmp(*it_bv1, *it_bv2);
 	}
-	fprintf(stream, "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+	return cmp_result;
+}
+
+static int bridge_cmp(const bridge_mac_t &b1, const bridge_mac_t &b2)
+{
+	if (strcmp(b1.ifname, b2.ifname))
+		return 1;
+	return memcmp(b1.addr, b2.addr, ETH_ALEN);
+}
+
+static void bridge_display_info(const bridge_mac_t & b, std::FILE *stream)
+{
+	fprintf(stream, "interface name: %s\n", b.ifname);
+	char mac[19];
+	snprintf(mac, sizeof(mac), "%02x:%02x:%02x:%02x:%02x:%02x",
+     b.addr[0], b.addr[1], b.addr[2], b.addr[3], b.addr[4], b.addr[5]);
+	fprintf(stream, "mac address: %s\n", mac);
 }

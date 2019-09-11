@@ -11,7 +11,7 @@ int main(int argc, char** argv)
 		std::string bridge_name = argv[1];
 		while(1)
 		{
-			bridge_read(bridge_name.c_str(), stdout);
+			bridge_update(bridge_name.c_str());
 
 			std::this_thread::sleep_for(std::chrono::seconds(2));	
 		}
